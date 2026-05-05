@@ -130,6 +130,7 @@ export default function AgendaPage({ pessoas, onNavegar }) {
     }
 
     if (filtros.aniversario) pessoas.forEach(p => {
+      if (!p.dataAniversario) return
       const { day, month } = parseDate(p.dataAniversario)
       const key = `${ano}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
       add(key, {

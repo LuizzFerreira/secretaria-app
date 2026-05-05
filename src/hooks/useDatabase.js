@@ -78,17 +78,18 @@ export function useDatabase(table) {
   }, [table, user])
 
   useEffect(() => {
+    if (!user) return
     fetchItems()
 
     const channel = supabase
-      .channel(`${table}-changes`)
+      .channel(`${table}-${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
         fetchItems()
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [table, fetchItems])
+  }, [table, fetchItems, user])
 
   const insert = async (data) => {
     if (!user) return

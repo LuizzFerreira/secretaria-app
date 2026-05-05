@@ -3,6 +3,7 @@ import { Search, X, LogOut } from 'lucide-react'
 import Sidebar from './components/Sidebar'
 import NotificationBell from './components/NotificationBell'
 import ExcelUploader from './components/ExcelUploader'
+import PlanilhasInfo from './components/PlanilhasInfo'
 import HomePage from './pages/HomePage'
 import EventosPage from './pages/EventosPage'
 import CalendarioPage from './pages/CalendarioPage'
@@ -11,6 +12,7 @@ import ViagensPage from './pages/ViagensPage'
 import AgendaPage from './pages/AgendaPage'
 import LoginPage from './pages/LoginPage'
 import { useAuth } from './contexts/AuthContext'
+import { usePlanilhas } from './hooks/usePlanilhas'
 import { useDatabase } from './hooks/useDatabase'
 import { lerPlanilha } from './data/excelReader'
 import { lerViagensDeArquivo } from './data/excelViagens'
@@ -49,57 +51,44 @@ export default function App() {
   const [gerenciaSelecionada, setGerenciaSelecionada] = useState('')
   const barraTop = useBarraGlobalHeight()
 
-  // Aniversariantes ficam em memória (carregados via upload de planilha)
-  const [pessoas, setPessoas] = useState([])
-  const [planilhaCarregada, setPlanilhaCarregada] = useState(false)
+  // Planilhas persistidas no Supabase
+  const { planilhas: planilhasAniv, dados: pessoas, adicionar: adicionarAniv, remover: removerAniv } = usePlanilhas('aniversarios')
+  const { planilhas: planilhasViagens, dados: viagensPlanilha, adicionar: adicionarViagem, remover: removerViagem } = usePlanilhas('viagens')
 
-  // Viagens vão pro Supabase
-  const { items: viagens, insert: insertViagem } = useDatabase('viagens')
+  // Viagens do Supabase (cadastradas manualmente)
+  const { items: viagensDb, insert: insertViagem } = useDatabase('viagens')
 
-  const handleAniversarios = async (file, modo) => {
+  // Quando sobe planilha de viagens, salva os registros no banco também
+  const handleAniversarios = async (file) => {
     try {
       const dados = await lerPlanilha(file)
       if (dados.length === 0) return alert('Nenhum dado encontrado na planilha.')
-      if (modo === 'substituir') {
-        setPessoas(dados)
-      } else {
-        const existentes = new Set(pessoas.map(p => p.nome.toLowerCase().trim()))
-        const novos = dados.filter(p => !existentes.has(p.nome.toLowerCase().trim()))
-        setPessoas(prev => [...prev, ...novos])
-      }
-      setPlanilhaCarregada(true)
-      alert(`${modo === 'substituir' ? 'Planilha carregada' : 'Dados adicionados'}! ${dados.length} pessoa(s).`)
+      const ok = await adicionarAniv(file.name, dados)
+      if (ok) alert(`"${file.name}" carregada! ${dados.length} pessoa(s).`)
     } catch {
       alert('Erro ao ler a planilha de aniversários.')
     }
   }
 
-  const handleViagens = async (file, modo) => {
+  const handleViagens = async (file) => {
     try {
       const dados = await lerViagensDeArquivo(file)
-      if (dados.length === 0) return alert('Nenhuma viagem encontrada na planilha. Verifique se tem colunas como "Viajante" e "Destino".')
-
+      if (dados.length === 0) return alert('Nenhuma viagem encontrada. Verifique se tem colunas como "Viajante" e "Destino".')
+      // Salva no Supabase como viagens individuais
       let count = 0
       for (const v of dados) {
-        if (modo === 'ajustar') {
-          const existe = viagens.find(ex =>
-            ex.viajante.toLowerCase() === v.viajante.toLowerCase() &&
-            ex.dataIda === v.dataIda &&
-            ex.destino.toLowerCase() === v.destino.toLowerCase()
-          )
-          if (existe) continue
-        }
         await insertViagem(v)
         count++
       }
-      alert(`${count} viagem(ns) importada(s) com sucesso!`)
+      // Também registra a planilha pra mostrar o nome
+      await adicionarViagem(file.name, dados)
+      alert(`"${file.name}" importada! ${count} viagem(ns).`)
     } catch (err) {
       console.error(err)
       alert('Erro ao ler a planilha de viagens.')
     }
   }
 
-  const hoje = new Date()
   const aniversariantesHoje = useMemo(
     () => filtrarAniversariantes(pessoas, 'hoje'),
     [pessoas]
@@ -179,28 +168,25 @@ export default function App() {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {aniversariantesHoje.length > 0 && (
               <span className="text-xs bg-amber-100 text-amber-700 px-3 py-1.5 rounded-full animate-pulse font-medium">
                 🎉 {aniversariantesHoje.length} aniversariante{aniversariantesHoje.length > 1 ? 's' : ''} hoje!
               </span>
             )}
             <NotificationBell aniversariantes={aniversariantesHoje} />
-            {planilhaCarregada && (
-              <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full">
-                ✓ Planilha
-              </span>
-            )}
-            <ExcelUploader onAniversarios={handleAniversarios} onViagens={handleViagens} hasData={planilhaCarregada} />
+            <PlanilhasInfo planilhas={planilhasAniv} onRemover={removerAniv} label="aniv." />
+            <PlanilhasInfo planilhas={planilhasViagens} onRemover={removerViagem} label="viag." />
+            <ExcelUploader onAniversarios={handleAniversarios} onViagens={handleViagens} hasData={planilhasAniv.length > 0} />
 
             {/* Avatar + Logout */}
-            <div className="flex items-center gap-2 ml-2 pl-3 border-l border-gray-200">
+            <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
               <img
                 src={user.user_metadata?.avatar_url}
                 alt=""
                 className="w-7 h-7 rounded-full"
               />
-              <span className="text-xs text-gray-600 font-medium max-w-[100px] truncate">
+              <span className="text-xs text-gray-600 font-medium max-w-[80px] truncate">
                 {user.user_metadata?.full_name?.split(' ')[0] || user.email}
               </span>
               <button
