@@ -11,9 +11,10 @@ import ViagensPage from './pages/ViagensPage'
 import AgendaPage from './pages/AgendaPage'
 import LoginPage from './pages/LoginPage'
 import { useAuth } from './contexts/AuthContext'
-import { lerPlanilha, lerPlanilhaDeURL } from './data/excelReader'
+import { useDatabase } from './hooks/useDatabase'
+import { lerPlanilha } from './data/excelReader'
+import { lerViagensDeArquivo } from './data/excelViagens'
 import { filtrarAniversariantes, getGerenciasUnicas } from './data/utils'
-import planilhaAnivUrl from './Aniversariantes DTA- RJ (1).xlsx?url'
 
 function useBarraGlobalHeight() {
   const [height, setHeight] = useState(0)
@@ -48,22 +49,12 @@ export default function App() {
   const [gerenciaSelecionada, setGerenciaSelecionada] = useState('')
   const barraTop = useBarraGlobalHeight()
 
+  // Aniversariantes ficam em memória (carregados via upload de planilha)
   const [pessoas, setPessoas] = useState([])
   const [planilhaCarregada, setPlanilhaCarregada] = useState(false)
-  const [carregando, setCarregando] = useState(true)
 
-  useEffect(() => {
-    if (!user) return
-    lerPlanilhaDeURL(planilhaAnivUrl)
-      .then(dados => {
-        if (dados.length > 0) {
-          setPessoas(dados)
-          setPlanilhaCarregada(true)
-        }
-      })
-      .catch(err => console.error('Erro ao carregar planilha:', err))
-      .finally(() => setCarregando(false))
-  }, [user])
+  // Viagens vão pro Supabase
+  const { items: viagens, insert: insertViagem } = useDatabase('viagens')
 
   const handleAniversarios = async (file, modo) => {
     try {
@@ -77,13 +68,35 @@ export default function App() {
         setPessoas(prev => [...prev, ...novos])
       }
       setPlanilhaCarregada(true)
+      alert(`${modo === 'substituir' ? 'Planilha carregada' : 'Dados adicionados'}! ${dados.length} pessoa(s).`)
     } catch {
-      alert('Erro ao ler a planilha.')
+      alert('Erro ao ler a planilha de aniversários.')
     }
   }
 
-  const handleViagens = async () => {
-    alert('As viagens são gerenciadas diretamente na página de Viagens.')
+  const handleViagens = async (file, modo) => {
+    try {
+      const dados = await lerViagensDeArquivo(file)
+      if (dados.length === 0) return alert('Nenhuma viagem encontrada na planilha. Verifique se tem colunas como "Viajante" e "Destino".')
+
+      let count = 0
+      for (const v of dados) {
+        if (modo === 'ajustar') {
+          const existe = viagens.find(ex =>
+            ex.viajante.toLowerCase() === v.viajante.toLowerCase() &&
+            ex.dataIda === v.dataIda &&
+            ex.destino.toLowerCase() === v.destino.toLowerCase()
+          )
+          if (existe) continue
+        }
+        await insertViagem(v)
+        count++
+      }
+      alert(`${count} viagem(ns) importada(s) com sucesso!`)
+    } catch (err) {
+      console.error(err)
+      alert('Erro ao ler a planilha de viagens.')
+    }
   }
 
   const hoje = new Date()
@@ -101,7 +114,7 @@ export default function App() {
   const renderPagina = () => {
     switch (pagina) {
       case 'home':
-        return <HomePage pessoas={pessoas} carregando={carregando} busca={busca} setBusca={setBusca} gerenciaSelecionada={gerenciaSelecionada} setGerenciaSelecionada={setGerenciaSelecionada} />
+        return <HomePage pessoas={pessoas} carregando={false} busca={busca} setBusca={setBusca} gerenciaSelecionada={gerenciaSelecionada} setGerenciaSelecionada={setGerenciaSelecionada} />
       case 'agenda':
         return <AgendaPage pessoas={pessoas} onNavegar={navegarPara} />
       case 'eventos':
@@ -113,11 +126,10 @@ export default function App() {
       case 'viagens':
         return <ViagensPage focoId={focoId} onFocoConcluido={() => setFocoId(null)} />
       default:
-        return <HomePage pessoas={pessoas} carregando={carregando} />
+        return <HomePage pessoas={pessoas} carregando={false} />
     }
   }
 
-  // Loading
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
@@ -126,10 +138,8 @@ export default function App() {
     )
   }
 
-  // Não logado
   if (!user) return <LoginPage />
 
-  // Logado
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50" style={{ paddingTop: barraTop }}>
       <header className="ml-56 border-b border-gray-100 bg-white/80 backdrop-blur sticky top-0 z-30">
@@ -178,7 +188,7 @@ export default function App() {
             <NotificationBell aniversariantes={aniversariantesHoje} />
             {planilhaCarregada && (
               <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full">
-                ✓ Planilhas
+                ✓ Planilha
               </span>
             )}
             <ExcelUploader onAniversarios={handleAniversarios} onViagens={handleViagens} hasData={planilhaCarregada} />

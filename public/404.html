@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script>
+      // Redireciona 404 para index.html (SPA no GitHub Pages)
+      window.location.replace(
+        window.location.origin + '/secretaria-app/' + 
+        (window.location.pathname.replace('/secretaria-app/', '') || '')
+      )
+    </script>
+  </head>
+</html>
