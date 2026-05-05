@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, Cake, Plane, PartyPopper, Clock, MapPin } from 'lucide-react'
 import { useDatabase } from '../hooks/useDatabase'
+import { usePlanilhas } from '../hooks/usePlanilhas'
 import { parseDate } from '../data/utils'
 
 const DIAS_SEMANA = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB']
@@ -102,8 +103,15 @@ function DetalhesDia({ data, itens, onFechar, onItemClick }) {
 }
 
 export default function AgendaPage({ pessoas, onNavegar }) {
-  const { items: eventos } = useDatabase('eventos')
-  const { items: viagens } = useDatabase('viagens')
+  const { items: eventosDb } = useDatabase('eventos')
+  const { items: viagensDb } = useDatabase('viagens')
+  const { dados: viagensPlanilha } = usePlanilhas('viagens')
+
+  const eventos = eventosDb
+  const viagens = useMemo(() => {
+    const planilhaItems = viagensPlanilha.map((v, i) => ({ ...v, id: `planilha-${i}` }))
+    return [...viagensDb, ...planilhaItems]
+  }, [viagensDb, viagensPlanilha])
 
   const hoje = new Date()
   const [ano, setAno] = useState(hoje.getFullYear())

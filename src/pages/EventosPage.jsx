@@ -1,12 +1,17 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Plus, Search, X, Trash2, Edit3, Check, PartyPopper, Calendar, MapPin, Clock, Users } from 'lucide-react'
+import { Plus, Search, X, Trash2, Edit3, Check, PartyPopper, Calendar, MapPin, Clock, Users, Share2 } from 'lucide-react'
 import { useDatabase } from '../hooks/useDatabase'
+import { useCompartilharBatch } from '../hooks/useCompartilhamentos'
+import { useAuth } from '../contexts/AuthContext'
+import ConvidadosInput from '../components/ConvidadosInput'
+import { supabase } from '../lib/supabase'
 
 function FormEvento({ evento, onSalvar, onCancelar }) {
   const [form, setForm] = useState({
     titulo: '', descricao: '', data: '', horario: '', local: '', tipo: 'confraternizacao',
     ...evento,
   })
+  const [convidados, setConvidados] = useState(evento?._convidados || [])
   const set = (campo) => (e) => setForm(prev => ({ ...prev, [campo]: e.target.value }))
 
   const handleSubmit = (e) => {
@@ -14,9 +19,9 @@ function FormEvento({ evento, onSalvar, onCancelar }) {
     if (!form.titulo.trim()) return
     onSalvar({
       ...form,
-      id: form.id || Date.now(),
+      id: form.id || undefined,
       criadoEm: form.criadoEm || new Date().toISOString(),
-    })
+    }, convidados)
   }
 
   return (
@@ -57,6 +62,7 @@ function FormEvento({ evento, onSalvar, onCancelar }) {
           </select>
         </div>
       </div>
+      <ConvidadosInput emails={convidados} onChange={setConvidados} />
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onCancelar} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 cursor-pointer">Cancelar</button>
         <button type="submit" className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 cursor-pointer">
@@ -75,7 +81,7 @@ const TIPO_LABEL = {
   outro: { label: 'Outro', color: 'bg-gray-100 text-gray-600' },
 }
 
-function CardEvento({ evento, onEditar, onExcluir, destaque }) {
+function CardEvento({ evento, onEditar, onExcluir, destaque, isOwner, convidadosCount }) {
   const ref = useRef(null)
   const tipo = TIPO_LABEL[evento.tipo] || TIPO_LABEL.outro
   const dataFormatada = evento.data
@@ -91,14 +97,26 @@ function CardEvento({ evento, onEditar, onExcluir, destaque }) {
   return (
     <div ref={ref} className={`bg-white/80 backdrop-blur border rounded-2xl p-5 transition-all hover:shadow-md group ${destaque ? 'border-blue-400 shadow-lg ring-2 ring-blue-200' : 'border-gray-100'}`}>
       <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <h3 className="font-semibold text-gray-800 text-sm">{evento.titulo}</h3>
           <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${tipo.color}`}>{tipo.label}</span>
+          {convidadosCount > 0 && (
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 flex items-center gap-0.5">
+              <Share2 size={9} /> {convidadosCount}
+            </span>
+          )}
+          {!isOwner && (
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">
+              compartilhado
+            </span>
+          )}
         </div>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onEditar(evento)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-blue-500 cursor-pointer"><Edit3 size={14} /></button>
-          <button onClick={() => onExcluir(evento.id)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-red-500 cursor-pointer"><Trash2 size={14} /></button>
-        </div>
+        {isOwner && (
+          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={() => onEditar(evento)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-blue-500 cursor-pointer"><Edit3 size={14} /></button>
+            <button onClick={() => onExcluir(evento.id)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-red-500 cursor-pointer"><Trash2 size={14} /></button>
+          </div>
+        )}
       </div>
       {evento.descricao && <p className="text-sm text-gray-600 mb-3 line-clamp-2">{evento.descricao}</p>}
       <div className="flex items-center gap-4 text-[11px] text-gray-400">
@@ -111,11 +129,37 @@ function CardEvento({ evento, onEditar, onExcluir, destaque }) {
 }
 
 export default function EventosPage({ focoId, onFocoConcluido }) {
+  const { user } = useAuth()
   const { items: eventos, insert, update, remove } = useDatabase('eventos')
+  const { compartilharEmBatch } = useCompartilharBatch()
   const [busca, setBusca] = useState('')
   const [mostrarForm, setMostrarForm] = useState(false)
   const [editando, setEditando] = useState(null)
   const [destaqueId, setDestaqueId] = useState(null)
+  const [compartilhamentos, setCompartilhamentos] = useState({})
+
+  // Carrega compartilhamentos de todos os eventos
+  useEffect(() => {
+    if (!user || eventos.length === 0) return
+    const fetchCompartilhamentos = async () => {
+      const ids = eventos.map(e => e.id).filter(Boolean)
+      if (ids.length === 0) return
+      const { data } = await supabase
+        .from('compartilhamentos')
+        .select('*')
+        .eq('tipo', 'evento')
+        .in('item_id', ids)
+      if (data) {
+        const mapa = {}
+        data.forEach(c => {
+          if (!mapa[c.item_id]) mapa[c.item_id] = []
+          mapa[c.item_id].push(c)
+        })
+        setCompartilhamentos(mapa)
+      }
+    }
+    fetchCompartilhamentos()
+  }, [user, eventos])
 
   useEffect(() => {
     if (focoId) {
@@ -129,20 +173,55 @@ export default function EventosPage({ focoId, onFocoConcluido }) {
     if (!busca.trim()) return eventos
     const termo = busca.toLowerCase()
     return eventos.filter(e =>
-      e.titulo.toLowerCase().includes(termo) || (e.descricao || '').toLowerCase().includes(termo)
+      (e.titulo || '').toLowerCase().includes(termo) || (e.descricao || '').toLowerCase().includes(termo)
     )
   }, [eventos, busca])
 
-  const handleSalvar = (evento) => {
+  const handleSalvar = async (evento, convidados) => {
     const existe = eventos.find(e => e.id === evento.id)
-    if (existe) update(evento.id, evento)
-    else insert(evento)
+    let itemId = evento.id
+
+    if (existe) {
+      await update(evento.id, evento)
+    } else {
+      // Insert e pega o id retornado
+      const { data } = await supabase.from('eventos').insert({
+        titulo: evento.titulo,
+        descricao: evento.descricao,
+        data: evento.data || null,
+        horario: evento.horario,
+        local: evento.local,
+        tipo: evento.tipo,
+        user_id: user.id,
+      }).select('id').single()
+      if (data) itemId = data.id
+    }
+
+    // Compartilhar com convidados
+    if (itemId && convidados.length > 0) {
+      await compartilharEmBatch('evento', itemId, convidados)
+    }
+
     setMostrarForm(false)
     setEditando(null)
   }
 
-  const handleExcluir = (id) => {
+  const handleEditar = async (evento) => {
+    // Carrega convidados do evento
+    const { data } = await supabase
+      .from('compartilhamentos')
+      .select('shared_with_email')
+      .eq('tipo', 'evento')
+      .eq('item_id', evento.id)
+    const convidados = (data || []).map(c => c.shared_with_email)
+    setEditando({ ...evento, _convidados: convidados })
+    setMostrarForm(true)
+  }
+
+  const handleExcluir = async (id) => {
     if (!confirm('Excluir este evento?')) return
+    // Remove compartilhamentos também
+    await supabase.from('compartilhamentos').delete().eq('tipo', 'evento').eq('item_id', id)
     remove(id)
   }
 
@@ -185,7 +264,15 @@ export default function EventosPage({ focoId, onFocoConcluido }) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtrados.map(e => (
-            <CardEvento key={e.id} evento={e} destaque={destaqueId === e.id} onEditar={(ev) => { setEditando(ev); setMostrarForm(true) }} onExcluir={handleExcluir} />
+            <CardEvento
+              key={e.id}
+              evento={e}
+              destaque={destaqueId === e.id}
+              isOwner={e.user_id === user?.id}
+              convidadosCount={(compartilhamentos[e.id] || []).length}
+              onEditar={handleEditar}
+              onExcluir={handleExcluir}
+            />
           ))}
         </div>
       )}
