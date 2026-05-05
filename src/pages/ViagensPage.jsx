@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Plus, Search, X, Trash2, Edit3, Check, Plane, MapPin, ChevronDown, ChevronUp } from 'lucide-react'
 import { useDatabase } from '../hooks/useDatabase'
+import { usePlanilhas } from '../hooks/usePlanilhas'
 
 const STATUS_OPTIONS = [
   { id: 'planejada', label: 'Planejada', color: 'bg-blue-100 text-blue-700' },
@@ -177,14 +178,14 @@ function CardViagem({ viagem, onEditar, onExcluir, expandido, onToggle }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-0.5">
-            <p className="font-semibold text-gray-800 text-sm truncate">{viagem.viajante}</p>
+            <p className="font-semibold text-gray-800 text-sm truncate">{viagem.viajante || 'Sem nome'}</p>
             <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${statusConfig.color}`}>
               {statusConfig.label}
             </span>
           </div>
           <p className="text-xs text-gray-400 flex items-center gap-1.5">
             <MapPin size={11} />
-            {viagem.origem || '?'} → {viagem.destino}
+            {viagem.origem || '?'} → {viagem.destino || '?'}
             {viagem.dataIda && <span className="ml-2">• {formatarDataBR(viagem.dataIda)}</span>}
             {viagem.dataVolta && <span>— {formatarDataBR(viagem.dataVolta)}</span>}
           </p>
@@ -262,7 +263,14 @@ function CardViagem({ viagem, onEditar, onExcluir, expandido, onToggle }) {
 }
 
 export default function ViagensPage({ focoId, onFocoConcluido }) {
-  const { items: viagens, insert, update, remove } = useDatabase('viagens')
+  const { items: viagensDb, insert, update, remove } = useDatabase('viagens')
+  const { dados: viagensPlanilha } = usePlanilhas('viagens')
+
+  // Combinar viagens do banco + planilhas
+  const viagens = useMemo(() => {
+    const planilhaItems = viagensPlanilha.map((v, i) => ({ ...v, id: `planilha-${i}`, fromPlanilha: true }))
+    return [...viagensDb, ...planilhaItems]
+  }, [viagensDb, viagensPlanilha])
   const [busca, setBusca] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('')
   const [mostrarForm, setMostrarForm] = useState(false)
@@ -282,8 +290,8 @@ export default function ViagensPage({ focoId, onFocoConcluido }) {
     if (busca.trim()) {
       const termo = busca.toLowerCase()
       lista = lista.filter(v =>
-        v.viajante.toLowerCase().includes(termo) ||
-        v.destino.toLowerCase().includes(termo) ||
+        (v.viajante || '').toLowerCase().includes(termo) ||
+        (v.destino || '').toLowerCase().includes(termo) ||
         (v.origem || '').toLowerCase().includes(termo) ||
         (v.hotel || '').toLowerCase().includes(termo)
       )

@@ -158,7 +158,7 @@ export default function AgendaPage({ pessoas, onNavegar }) {
         add(v.dataIda, {
           tipo: 'viagem',
           id: v.id,
-          label: `✈️ ${v.viajante.split(' ')[0]} → ${v.destino}`,
+          label: `✈️ ${(v.viajante || '').split(' ')[0] || '?'} → ${v.destino || '?'}`,
           detalhe: `Ida${v.vooIda ? ` • Voo ${v.vooIda}` : ''}`,
           horario: v.horarioIda,
         })
@@ -167,7 +167,7 @@ export default function AgendaPage({ pessoas, onNavegar }) {
         add(v.dataVolta, {
           tipo: 'viagem',
           id: v.id,
-          label: `✈️ ${v.viajante.split(' ')[0]} ← ${v.destino}`,
+          label: `✈️ ${(v.viajante || '').split(' ')[0] || '?'} ← ${v.destino || '?'}`,
           detalhe: `Volta${v.vooVolta ? ` • Voo ${v.vooVolta}` : ''}`,
           horario: v.horarioVolta,
         })

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -62,9 +62,13 @@ const toCamel = (obj) => {
   return result
 }
 
+let channelCounter = 0
+
 export function useDatabase(table) {
   const [items, setItems] = useState([])
   const { user } = useAuth()
+  const channelRef = useRef(null)
+  const idRef = useRef(++channelCounter)
 
   const fetchItems = useCallback(async () => {
     if (!user) return
@@ -79,17 +83,26 @@ export function useDatabase(table) {
 
   useEffect(() => {
     if (!user) return
+
     fetchItems()
 
+    const channelName = `${table}-${user.id}-${idRef.current}`
     const channel = supabase
-      .channel(`${table}-${user.id}`)
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
         fetchItems()
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
-  }, [table, fetchItems, user])
+    channelRef.current = channel
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
+    }
+  }, [table, user, fetchItems])
 
   const insert = async (data) => {
     if (!user) return

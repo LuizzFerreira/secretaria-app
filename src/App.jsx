@@ -13,7 +13,6 @@ import AgendaPage from './pages/AgendaPage'
 import LoginPage from './pages/LoginPage'
 import { useAuth } from './contexts/AuthContext'
 import { usePlanilhas } from './hooks/usePlanilhas'
-import { useDatabase } from './hooks/useDatabase'
 import { lerPlanilha } from './data/excelReader'
 import { lerViagensDeArquivo } from './data/excelViagens'
 import { filtrarAniversariantes, getGerenciasUnicas } from './data/utils'
@@ -53,10 +52,7 @@ export default function App() {
 
   // Planilhas persistidas no Supabase
   const { planilhas: planilhasAniv, dados: pessoas, adicionar: adicionarAniv, remover: removerAniv } = usePlanilhas('aniversarios')
-  const { planilhas: planilhasViagens, dados: viagensPlanilha, adicionar: adicionarViagem, remover: removerViagem } = usePlanilhas('viagens')
-
-  // Viagens do Supabase (cadastradas manualmente)
-  const { items: viagensDb, insert: insertViagem } = useDatabase('viagens')
+  const { planilhas: planilhasViagens, adicionar: adicionarViagem, remover: removerViagem } = usePlanilhas('viagens')
 
   // Quando sobe planilha de viagens, salva os registros no banco também
   const handleAniversarios = async (file) => {
@@ -74,15 +70,9 @@ export default function App() {
     try {
       const dados = await lerViagensDeArquivo(file)
       if (dados.length === 0) return alert('Nenhuma viagem encontrada. Verifique se tem colunas como "Viajante" e "Destino".')
-      // Salva no Supabase como viagens individuais
-      let count = 0
-      for (const v of dados) {
-        await insertViagem(v)
-        count++
-      }
-      // Também registra a planilha pra mostrar o nome
+      // Registra a planilha pra mostrar o nome
       await adicionarViagem(file.name, dados)
-      alert(`"${file.name}" importada! ${count} viagem(ns).`)
+      alert(`"${file.name}" importada! ${dados.length} viagem(ns). Acesse a página de Viagens para visualizar.`)
     } catch (err) {
       console.error(err)
       alert('Erro ao ler a planilha de viagens.')
