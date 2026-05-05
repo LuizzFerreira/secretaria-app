@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Search, X } from 'lucide-react'
+import { Search, X, LogOut } from 'lucide-react'
 import Sidebar from './components/Sidebar'
 import NotificationBell from './components/NotificationBell'
 import ExcelUploader from './components/ExcelUploader'
@@ -9,6 +9,8 @@ import CalendarioPage from './pages/CalendarioPage'
 import AnotacoesPage from './pages/AnotacoesPage'
 import ViagensPage from './pages/ViagensPage'
 import AgendaPage from './pages/AgendaPage'
+import LoginPage from './pages/LoginPage'
+import { useAuth } from './contexts/AuthContext'
 import { lerPlanilha, lerPlanilhaDeURL } from './data/excelReader'
 import { filtrarAniversariantes, getGerenciasUnicas } from './data/utils'
 import planilhaAnivUrl from './Aniversariantes DTA- RJ (1).xlsx?url'
@@ -39,6 +41,7 @@ function useBarraGlobalHeight() {
 }
 
 export default function App() {
+  const { user, loading, signOut } = useAuth()
   const [pagina, setPagina] = useState('home')
   const [focoId, setFocoId] = useState(null)
   const [busca, setBusca] = useState('')
@@ -50,6 +53,7 @@ export default function App() {
   const [carregando, setCarregando] = useState(true)
 
   useEffect(() => {
+    if (!user) return
     lerPlanilhaDeURL(planilhaAnivUrl)
       .then(dados => {
         if (dados.length > 0) {
@@ -59,7 +63,7 @@ export default function App() {
       })
       .catch(err => console.error('Erro ao carregar planilha:', err))
       .finally(() => setCarregando(false))
-  }, [])
+  }, [user])
 
   const handleAniversarios = async (file, modo) => {
     try {
@@ -78,8 +82,7 @@ export default function App() {
     }
   }
 
-  const handleViagens = async (file, modo) => {
-    // Viagens agora são gerenciadas pelo Supabase via ViagensPage
+  const handleViagens = async () => {
     alert('As viagens são gerenciadas diretamente na página de Viagens.')
   }
 
@@ -114,6 +117,19 @@ export default function App() {
     }
   }
 
+  // Loading
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <p className="text-gray-400">Carregando...</p>
+      </div>
+    )
+  }
+
+  // Não logado
+  if (!user) return <LoginPage />
+
+  // Logado
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50" style={{ paddingTop: barraTop }}>
       <header className="ml-56 border-b border-gray-100 bg-white/80 backdrop-blur sticky top-0 z-30">
@@ -166,6 +182,25 @@ export default function App() {
               </span>
             )}
             <ExcelUploader onAniversarios={handleAniversarios} onViagens={handleViagens} hasData={planilhaCarregada} />
+
+            {/* Avatar + Logout */}
+            <div className="flex items-center gap-2 ml-2 pl-3 border-l border-gray-200">
+              <img
+                src={user.user_metadata?.avatar_url}
+                alt=""
+                className="w-7 h-7 rounded-full"
+              />
+              <span className="text-xs text-gray-600 font-medium max-w-[100px] truncate">
+                {user.user_metadata?.full_name?.split(' ')[0] || user.email}
+              </span>
+              <button
+                onClick={signOut}
+                title="Sair"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all cursor-pointer"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
           </div>
         </div>
       </header>

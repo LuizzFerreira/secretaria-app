@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
-// Mapeia campos camelCase do front para snake_case do banco
 const toSnake = (obj) => {
   const map = {
     criadoEm: 'criado_em',
@@ -25,7 +25,6 @@ const toSnake = (obj) => {
   const result = {}
   for (const [key, value] of Object.entries(obj)) {
     const snakeKey = map[key] || key
-    // Não enviar campos vazios de data como string vazia (Supabase espera null)
     if ((snakeKey === 'data_ida' || snakeKey === 'data_volta' || snakeKey === 'check_in' || snakeKey === 'check_out' || snakeKey === 'data') && value === '') {
       result[snakeKey] = null
     } else {
@@ -35,7 +34,6 @@ const toSnake = (obj) => {
   return result
 }
 
-// Mapeia campos snake_case do banco para camelCase do front
 const toCamel = (obj) => {
   const map = {
     criado_em: 'criadoEm',
@@ -66,8 +64,10 @@ const toCamel = (obj) => {
 
 export function useDatabase(table) {
   const [items, setItems] = useState([])
+  const { user } = useAuth()
 
   const fetchItems = useCallback(async () => {
+    if (!user) return
     const { data, error } = await supabase
       .from(table)
       .select('*')
@@ -75,12 +75,11 @@ export function useDatabase(table) {
     if (!error && data) {
       setItems(data.map(toCamel))
     }
-  }, [table])
+  }, [table, user])
 
   useEffect(() => {
     fetchItems()
 
-    // Realtime subscription
     const channel = supabase
       .channel(`${table}-changes`)
       .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
@@ -92,14 +91,16 @@ export function useDatabase(table) {
   }, [table, fetchItems])
 
   const insert = async (data) => {
+    if (!user) return
     const { id, ...rest } = toSnake(data)
-    const { error } = await supabase.from(table).insert(rest)
+    const { error } = await supabase.from(table).insert({ ...rest, user_id: user.id })
     if (!error) fetchItems()
   }
 
   const update = async (id, data) => {
     const snakeData = toSnake(data)
     delete snakeData.id
+    delete snakeData.user_id
     const { error } = await supabase.from(table).update(snakeData).eq('id', id)
     if (!error) fetchItems()
   }
