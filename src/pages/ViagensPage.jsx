@@ -263,7 +263,7 @@ function CardViagem({ viagem, onEditar, onExcluir, expandido, onToggle }) {
 }
 
 export default function ViagensPage({ focoId, onFocoConcluido }) {
-  const { items: viagensDb, insert, update, remove } = useDatabase('viagens')
+  const { items: viagensDb, insert, update, remove, refresh } = useDatabase('viagens')
   const { dados: viagensPlanilha } = usePlanilhas('viagens')
 
   // Combinar viagens do banco + planilhas
@@ -304,8 +304,9 @@ export default function ViagensPage({ focoId, onFocoConcluido }) {
 
   const handleSalvar = async (viagem) => {
     const existe = viagens.find(v => v.id === viagem.id)
-    if (existe) update(viagem.id, viagem)
-    else insert(viagem)
+    if (existe) await update(viagem.id, viagem)
+    else await insert(viagem)
+    await refresh()
     setMostrarForm(false)
     setEditando(null)
   }

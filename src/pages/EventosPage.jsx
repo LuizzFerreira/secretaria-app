@@ -237,7 +237,7 @@ function ModalEvento({ evento, onFechar, onEditar, onExcluir, isOwner, convidado
 
 export default function EventosPage({ focoId, onFocoConcluido }) {
   const { user } = useAuth()
-  const { items: eventos, insert, update, remove } = useDatabase('eventos')
+  const { items: eventos, insert, update, remove, refresh } = useDatabase('eventos')
   const { compartilharEmBatch } = useCompartilharBatch()
   const [busca, setBusca] = useState('')
   const [mostrarForm, setMostrarForm] = useState(false)
@@ -280,7 +280,13 @@ export default function EventosPage({ focoId, onFocoConcluido }) {
     let itemId = evento.id
 
     if (existe) {
-      await update(evento.id, evento)
+      // Update direto no supabase pra garantir que todos os campos vão corretos
+      await supabase.from('eventos').update({
+        titulo: evento.titulo, descricao: evento.descricao,
+        data: evento.data || null, horario: evento.horario,
+        data_fim: evento.dataFim || null, horario_fim: evento.horarioFim,
+        local: evento.local, link: evento.link, tipo: evento.tipo,
+      }).eq('id', evento.id)
     } else {
       const { data } = await supabase.from('eventos').insert({
         titulo: evento.titulo, descricao: evento.descricao,
@@ -292,6 +298,8 @@ export default function EventosPage({ focoId, onFocoConcluido }) {
     }
 
     if (itemId && convidados.length > 0) await compartilharEmBatch('evento', itemId, convidados)
+
+    await refresh()
     setMostrarForm(false)
     setEditando(null)
   }

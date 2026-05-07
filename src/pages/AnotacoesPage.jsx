@@ -80,7 +80,7 @@ function CardAnotacao({ nota, coluna, onEditar, onExcluir, isOwner, convidadosCo
       draggable
       onDragStart={(e) => onDragStart(e, nota)}
       onClick={() => onExpandir(nota)}
-      className={`${colunaConfig.cardBg} border ${colunaConfig.cardBorder} rounded-xl p-4 transition-all hover:shadow-md group cursor-grab active:cursor-grabbing active:shadow-lg active:scale-[1.02] ${nota.importante ? 'ring-2 ring-red-300 ring-offset-1' : ''}`}
+      className={`${colunaConfig.cardBg} border ${colunaConfig.cardBorder} rounded-xl p-4 transition-all hover:shadow-md group cursor-grab active:cursor-grabbing active:shadow-lg active:scale-[1.02]`}
     >
       <div className="flex items-start justify-between mb-1.5">
         <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
@@ -119,7 +119,7 @@ function ModalExpandido({ nota, onFechar, onEditar, onExcluir, isOwner, convidad
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-6" onClick={onFechar}>
-      <div className={`${colunaConfig.cardBg} border ${colunaConfig.cardBorder} rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden ${nota.importante ? 'ring-2 ring-red-300' : ''}`} onClick={e => e.stopPropagation()}>
+      <div className={`${colunaConfig.cardBg} border ${colunaConfig.cardBorder} rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden`} onClick={e => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-gray-200/50 flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">

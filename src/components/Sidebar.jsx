@@ -1,8 +1,9 @@
-import { Home, CalendarDays, CalendarRange, PartyPopper, StickyNote, Plane } from 'lucide-react'
+import { Home, CalendarDays, CalendarRange, PartyPopper, StickyNote, Plane, Cake } from 'lucide-react'
 import logoOns from '../logo-ons.png'
 
 const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: Home },
+  { id: 'aniversarios', label: 'Aniversários', icon: Cake },
   { id: 'agenda', label: 'Agenda', icon: CalendarRange },
   { id: 'viagens', label: 'Viagens', icon: Plane },
   { id: 'anotacoes', label: 'Anotações', icon: StickyNote },

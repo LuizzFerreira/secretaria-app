@@ -5,6 +5,7 @@ import NotificationBell from './components/NotificationBell'
 import ExcelUploader from './components/ExcelUploader'
 import PlanilhasInfo from './components/PlanilhasInfo'
 import HomePage from './pages/HomePage'
+import AniversariosPage from './pages/AniversariosPage'
 import EventosPage from './pages/EventosPage'
 import CalendarioPage from './pages/CalendarioPage'
 import AnotacoesPage from './pages/AnotacoesPage'
@@ -93,7 +94,9 @@ export default function App() {
   const renderPagina = () => {
     switch (pagina) {
       case 'home':
-        return <HomePage pessoas={pessoas} carregando={false} busca={busca} setBusca={setBusca} gerenciaSelecionada={gerenciaSelecionada} setGerenciaSelecionada={setGerenciaSelecionada} />
+        return <HomePage pessoas={pessoas} onNavegar={navegarPara} />
+      case 'aniversarios':
+        return <AniversariosPage pessoas={pessoas} busca={busca} setBusca={setBusca} gerenciaSelecionada={gerenciaSelecionada} setGerenciaSelecionada={setGerenciaSelecionada} />
       case 'agenda':
         return <AgendaPage pessoas={pessoas} onNavegar={navegarPara} />
       case 'eventos':
@@ -105,7 +108,7 @@ export default function App() {
       case 'viagens':
         return <ViagensPage focoId={focoId} onFocoConcluido={() => setFocoId(null)} />
       default:
-        return <HomePage pessoas={pessoas} carregando={false} />
+        return <HomePage pessoas={pessoas} onNavegar={navegarPara} />
     }
   }
 
