@@ -21,11 +21,13 @@ const toSnake = (obj) => {
     checkIn: 'check_in',
     checkOut: 'check_out',
     reservaHotel: 'reserva_hotel',
+    dataFim: 'data_fim',
+    horarioFim: 'horario_fim',
   }
   const result = {}
   for (const [key, value] of Object.entries(obj)) {
     const snakeKey = map[key] || key
-    if ((snakeKey === 'data_ida' || snakeKey === 'data_volta' || snakeKey === 'check_in' || snakeKey === 'check_out' || snakeKey === 'data') && value === '') {
+    if ((snakeKey === 'data_ida' || snakeKey === 'data_volta' || snakeKey === 'check_in' || snakeKey === 'check_out' || snakeKey === 'data' || snakeKey === 'data_fim') && value === '') {
       result[snakeKey] = null
     } else {
       result[snakeKey] = value
@@ -53,6 +55,8 @@ const toCamel = (obj) => {
     check_in: 'checkIn',
     check_out: 'checkOut',
     reserva_hotel: 'reservaHotel',
+    data_fim: 'dataFim',
+    horario_fim: 'horarioFim',
   }
   const result = {}
   for (const [key, value] of Object.entries(obj)) {
