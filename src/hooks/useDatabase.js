@@ -128,5 +128,5 @@ export function useDatabase(table) {
     if (!error) fetchItems()
   }
 
-  return { items, insert, update, remove }
+  return { items, insert, update, remove, refresh: fetchItems }
 }

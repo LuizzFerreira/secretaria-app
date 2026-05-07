@@ -1,30 +1,22 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Plus, Search, X, Trash2, Edit3, Check, StickyNote, Clock, Share2, GripVertical } from 'lucide-react'
+import { Plus, Search, X, Trash2, Edit3, Check, StickyNote, Clock, Share2, GripVertical, AlertTriangle } from 'lucide-react'
 import { useDatabase } from '../hooks/useDatabase'
 import { useCompartilharBatch } from '../hooks/useCompartilhamentos'
 import { useAuth } from '../contexts/AuthContext'
 import ConvidadosInput from '../components/ConvidadosInput'
 import { supabase } from '../lib/supabase'
 
-const CORES = [
-  { id: 'yellow', bg: 'bg-amber-50', border: 'border-amber-200', dot: 'bg-amber-400' },
-  { id: 'blue', bg: 'bg-blue-50', border: 'border-blue-200', dot: 'bg-blue-400' },
-  { id: 'green', bg: 'bg-green-50', border: 'border-green-200', dot: 'bg-green-400' },
-  { id: 'pink', bg: 'bg-pink-50', border: 'border-pink-200', dot: 'bg-pink-400' },
-  { id: 'purple', bg: 'bg-purple-50', border: 'border-purple-200', dot: 'bg-purple-400' },
-]
-
 const COLUNAS = [
-  { id: 'a_fazer', label: 'A Fazer', color: 'border-t-gray-400', bgHeader: 'bg-gray-50' },
-  { id: 'em_andamento', label: 'Em Andamento', color: 'border-t-blue-500', bgHeader: 'bg-blue-50' },
-  { id: 'concluido', label: 'Concluído', color: 'border-t-green-500', bgHeader: 'bg-green-50' },
+  { id: 'a_fazer', label: 'A Fazer', borderColor: 'border-t-amber-400', bgHeader: 'bg-amber-50', cardBg: 'bg-amber-50', cardBorder: 'border-amber-200' },
+  { id: 'em_andamento', label: 'Em Andamento', borderColor: 'border-t-blue-500', bgHeader: 'bg-blue-50', cardBg: 'bg-blue-50', cardBorder: 'border-blue-200' },
+  { id: 'concluido', label: 'Concluído', borderColor: 'border-t-green-500', bgHeader: 'bg-green-50', cardBg: 'bg-green-50', cardBorder: 'border-green-200' },
 ]
 
 function FormAnotacao({ nota, onSalvar, onCancelar }) {
   const [titulo, setTitulo] = useState(nota?.titulo || '')
   const [conteudo, setConteudo] = useState(nota?.conteudo || '')
-  const [cor, setCor] = useState(nota?.cor || 'yellow')
   const [status, setStatus] = useState(nota?.status || 'a_fazer')
+  const [importante, setImportante] = useState(nota?.importante || false)
   const [convidados, setConvidados] = useState(nota?._convidados || [])
 
   const handleSubmit = (e) => {
@@ -34,8 +26,8 @@ function FormAnotacao({ nota, onSalvar, onCancelar }) {
       id: nota?.id || undefined,
       titulo: titulo.trim(),
       conteudo: conteudo.trim(),
-      cor,
       status,
+      importante,
       criadoEm: nota?.criadoEm || new Date().toISOString(),
       atualizadoEm: new Date().toISOString(),
     }, convidados)
@@ -51,14 +43,8 @@ function FormAnotacao({ nota, onSalvar, onCancelar }) {
         className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400" />
       <textarea placeholder="Escreva sua anotação aqui..." value={conteudo} onChange={e => setConteudo(e.target.value)} rows={4}
         className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 resize-none" />
+
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">Cor:</span>
-          {CORES.map(c => (
-            <button key={c.id} type="button" onClick={() => setCor(c.id)}
-              className={`w-5 h-5 rounded-full ${c.dot} cursor-pointer transition-all ${cor === c.id ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'opacity-50 hover:opacity-100'}`} />
-          ))}
-        </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400">Status:</span>
           <select value={status} onChange={e => setStatus(e.target.value)}
@@ -66,8 +52,17 @@ function FormAnotacao({ nota, onSalvar, onCancelar }) {
             {COLUNAS.map(c => (<option key={c.id} value={c.id}>{c.label}</option>))}
           </select>
         </div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={importante} onChange={e => setImportante(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-red-500 focus:ring-red-200 cursor-pointer" />
+          <span className="text-xs font-medium text-red-600 flex items-center gap-1">
+            <AlertTriangle size={12} /> Importante (fazer hoje)
+          </span>
+        </label>
       </div>
+
       <ConvidadosInput emails={convidados} onChange={setConvidados} />
+
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onCancelar} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 cursor-pointer">Cancelar</button>
         <button type="submit" className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 cursor-pointer">
@@ -78,18 +73,19 @@ function FormAnotacao({ nota, onSalvar, onCancelar }) {
   )
 }
 
-function CardAnotacao({ nota, onEditar, onExcluir, isOwner, convidadosCount, onDragStart, onExpandir }) {
-  const corConfig = CORES.find(c => c.id === nota.cor) || CORES[0]
+function CardAnotacao({ nota, coluna, onEditar, onExcluir, isOwner, convidadosCount, onDragStart, onExpandir }) {
+  const colunaConfig = COLUNAS.find(c => c.id === coluna) || COLUNAS[0]
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, nota)}
       onClick={() => onExpandir(nota)}
-      className={`${corConfig.bg} border ${corConfig.border} rounded-xl p-4 transition-all hover:shadow-md group cursor-grab active:cursor-grabbing active:shadow-lg active:scale-[1.02]`}
+      className={`${colunaConfig.cardBg} border ${colunaConfig.cardBorder} rounded-xl p-4 transition-all hover:shadow-md group cursor-grab active:cursor-grabbing active:shadow-lg active:scale-[1.02] ${nota.importante ? 'ring-2 ring-red-300 ring-offset-1' : ''}`}
     >
       <div className="flex items-start justify-between mb-1.5">
         <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
           <GripVertical size={12} className="text-gray-300 shrink-0" />
+          {nota.importante && <AlertTriangle size={12} className="text-red-500 shrink-0" />}
           <h3 className="font-semibold text-gray-800 text-xs truncate">{nota.titulo}</h3>
         </div>
         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
@@ -103,6 +99,9 @@ function CardAnotacao({ nota, onEditar, onExcluir, isOwner, convidadosCount, onD
           )}
         </div>
       </div>
+      {nota.importante && (
+        <p className="text-[10px] font-bold text-red-500 uppercase mb-1 pl-5">⚠️ Fazer hoje</p>
+      )}
       {nota.conteudo && <p className="text-[11px] text-gray-600 whitespace-pre-wrap line-clamp-4 mb-2 pl-5">{nota.conteudo}</p>}
       {nota.atualizadoEm && (
         <div className="flex items-center gap-1 text-[10px] text-gray-400 pl-5">
@@ -115,20 +114,24 @@ function CardAnotacao({ nota, onEditar, onExcluir, isOwner, convidadosCount, onD
 }
 
 function ModalExpandido({ nota, onFechar, onEditar, onExcluir, isOwner, convidadosCount }) {
-  const corConfig = CORES.find(c => c.id === nota.cor) || CORES[0]
-  const colunaLabel = COLUNAS.find(c => c.id === (nota.status || 'a_fazer'))?.label || 'A Fazer'
+  const colunaConfig = COLUNAS.find(c => c.id === (nota.status || 'a_fazer')) || COLUNAS[0]
+  const colunaLabel = colunaConfig.label
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-6" onClick={onFechar}>
-      <div className={`${corConfig.bg} border ${corConfig.border} rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden`} onClick={e => e.stopPropagation()}>
+      <div className={`${colunaConfig.cardBg} border ${colunaConfig.cardBorder} rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden ${nota.importante ? 'ring-2 ring-red-300' : ''}`} onClick={e => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-gray-200/50 flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-bold text-gray-800">{nota.titulo}</h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              {nota.importante && <AlertTriangle size={16} className="text-red-500" />}
+              <h2 className="text-lg font-bold text-gray-800">{nota.titulo}</h2>
+            </div>
             <div className="flex items-center gap-2 mt-1.5">
               <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/80 text-gray-600">{colunaLabel}</span>
+              {nota.importante && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600">⚠️ Importante</span>}
               {convidadosCount > 0 && (
                 <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 flex items-center gap-0.5">
-                  <Share2 size={9} /> {convidadosCount} convidado{convidadosCount > 1 ? 's' : ''}
+                  <Share2 size={9} /> {convidadosCount}
                 </span>
               )}
               {!isOwner && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-600">compartilhado</span>}
@@ -164,6 +167,8 @@ function ModalExpandido({ nota, onFechar, onEditar, onExcluir, isOwner, convidad
 
 function Coluna({ coluna, anotacoes, onEditar, onExcluir, onDragStart, onDrop, onExpandir, userId, compartilhamentos }) {
   const [dragOver, setDragOver] = useState(false)
+  const importantesCount = anotacoes.filter(n => n.importante).length
+
   return (
     <div
       className={`flex flex-col rounded-2xl border border-gray-100 overflow-hidden transition-all ${dragOver ? 'ring-2 ring-blue-300 bg-blue-50/30' : 'bg-white/40'}`}
@@ -171,13 +176,20 @@ function Coluna({ coluna, anotacoes, onEditar, onExcluir, onDragStart, onDrop, o
       onDragLeave={() => setDragOver(false)}
       onDrop={(e) => { e.preventDefault(); setDragOver(false); onDrop(coluna.id) }}
     >
-      <div className={`px-4 py-3 border-t-4 ${coluna.color} ${coluna.bgHeader} flex items-center justify-between`}>
+      <div className={`px-4 py-3 border-t-4 ${coluna.borderColor} ${coluna.bgHeader} flex items-center justify-between`}>
         <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">{coluna.label}</h3>
-        <span className="text-[10px] font-medium text-gray-400 bg-white/80 px-2 py-0.5 rounded-full">{anotacoes.length}</span>
+        <div className="flex items-center gap-1.5">
+          {importantesCount > 0 && (
+            <span className="text-[10px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+              <AlertTriangle size={9} /> {importantesCount}
+            </span>
+          )}
+          <span className="text-[10px] font-medium text-gray-400 bg-white/80 px-2 py-0.5 rounded-full">{anotacoes.length}</span>
+        </div>
       </div>
       <div className="flex-1 p-3 space-y-2.5 min-h-[200px]">
         {anotacoes.map(nota => (
-          <CardAnotacao key={nota.id} nota={nota} isOwner={nota.user_id === userId}
+          <CardAnotacao key={nota.id} nota={nota} coluna={coluna.id} isOwner={nota.user_id === userId}
             convidadosCount={(compartilhamentos[nota.id] || []).length}
             onEditar={onEditar} onExcluir={onExcluir} onDragStart={onDragStart} onExpandir={onExpandir} />
         ))}
@@ -189,7 +201,7 @@ function Coluna({ coluna, anotacoes, onEditar, onExcluir, onDragStart, onDrop, o
 
 export default function AnotacoesPage() {
   const { user } = useAuth()
-  const { items: anotacoes, insert, update, remove } = useDatabase('anotacoes')
+  const { items: anotacoes, insert, update, remove, refresh } = useDatabase('anotacoes')
   const { compartilharEmBatch } = useCompartilharBatch()
   const [busca, setBusca] = useState('')
   const [mostrarForm, setMostrarForm] = useState(false)
@@ -226,21 +238,32 @@ export default function AnotacoesPage() {
       if (mapa[status]) mapa[status].push(n)
       else mapa.a_fazer.push(n)
     })
+    // Importantes primeiro em cada coluna
+    Object.keys(mapa).forEach(k => {
+      mapa[k].sort((a, b) => (b.importante ? 1 : 0) - (a.importante ? 1 : 0))
+    })
     return mapa
   }, [filtradas])
 
   const handleSalvar = async (nota, convidados) => {
     const existe = anotacoes.find(n => n.id === nota.id)
     let itemId = nota.id
+
     if (existe) {
       await update(nota.id, nota)
     } else {
       const { data } = await supabase.from('anotacoes').insert({
-        titulo: nota.titulo, conteudo: nota.conteudo, cor: nota.cor, status: nota.status || 'a_fazer', user_id: user.id,
+        titulo: nota.titulo, conteudo: nota.conteudo, status: nota.status || 'a_fazer',
+        importante: nota.importante || false, user_id: user.id,
       }).select('id').single()
       if (data) itemId = data.id
     }
+
     if (itemId && convidados.length > 0) await compartilharEmBatch('anotacao', itemId, convidados)
+
+    // Força refresh da lista
+    if (refresh) await refresh()
+
     setMostrarForm(false)
     setEditando(null)
   }
